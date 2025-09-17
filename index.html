@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kub FPS: Kun/tun, zombilar faqat tunda chiqadi</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
+  <style>
+    html,body { margin:0; padding:0; background:#121; overflow:hidden; height:100%; width:100%; }
+    body { touch-action:none; }
+    #startPanel, #restartPanel {
+      position:fixed; left:0; top:0; width:100vw; height:100vh; z-index:10;
+      background:linear-gradient(120deg,#222 70%,#183e18 100%);
+      display:flex; flex-direction:column; justify-content:center; align-items:center;
+      transition:opacity 0.3s;
+    }
+    #startPanel.hide, #restartPanel.hide { opacity:0; pointer-events:none; }
+    .title { color:#fff; font-size:7vw; margin-bottom:4vh; font-family:sans-serif;}
+    button { font-size:6vw; padding:2vw 8vw; border-radius:4vw; }
+    #footer {
+      color:#e2e2e2; font-size:4vw; margin-top:5vh; font-family:sans-serif; opacity:.92;
+      position:absolute; bottom:2vh; width:100vw; left:0; text-align:center; letter-spacing:1px;
+      pointer-events:none; font-weight:bold; text-shadow:0 2px 8px #0008;
+    }
+    #help { position:absolute; right:3vw; top:2vw; z-index:12; color:#fff; background:#222d; padding:1vw 3vw; border-radius:3vw; font-size:3vw; opacity:.92; font-family:sans-serif; }
+    #hud {
+      position:absolute; left:3vw; bottom:5vw; z-index:20;
+      color:#fff; font-family:sans-serif; font-size:5vw;
+      background:rgba(30,40,30,0.45); border-radius:2vw; padding:1vw 4vw 1vw 3vw;
+      box-shadow: 0 2px 8px #0007;
+      font-weight:bold; letter-spacing:1px;
+      min-width:20vw;
+      user-select: none;
+    }
+    #hud .night { color:#b7e0ff; text-shadow:0 0 10px #00c8ff,0 0 24px #027;}
+    #hud .day   { color:#ffe45f; text-shadow:0 0 7px #ffe45f,0 0 20px #f8e;}
+    #hud .clock { font-size:4vw; display:inline-block; width:15vw;}
+    canvas { position:fixed; left:0; top:0; width:100vw!important; height:100vh!important; touch-action:none; }
+    #pointerlock-info {
+      position:fixed; left:0; top:0; width:100vw; height:100vh; display:flex; justify-content:center; align-items:center; background:#000c; z-index:100; color:#fff; font-size:6vw; font-family:sans-serif; text-align:center; display:none;
+    }
+    #mobile-controls {
+      display:none; position:fixed; left:0; bottom:0; width:100vw; height:100vh; pointer-events:none; z-index:30;
+    }
+    .mc-btn {
+      position:absolute; border-radius:50%; background:#222d; color:#ffe; font-size:6vw; opacity:.96;
+      border:2px solid #fff2; width:13vw; height:13vw; display:flex; align-items:center; justify-content:center;
+      box-shadow:0 2px 8px #0007; pointer-events:auto; user-select: none; touch-action:none;
+      transition:background .16s;
+    }
+    .mc-btn:active { background:#447f3c; }
+    #mc-w { left:15vw; bottom:21vw; }
+    #mc-a { left:3vw;  bottom:8vw; }
+    #mc-s { left:15vw; bottom:8vw; }
+    #mc-d { left:27vw; bottom:8vw; }
+    #mc-shoot { right:9vw; bottom:12vw; background:#c13923; font-size:7vw; }
+    #crosshair {
+      position:fixed; left:50vw; top:50vh; z-index:40; width:5vw; height:5vw; margin-left:-2.5vw; margin-top:-2.5vw;
+      pointer-events:none; opacity:.7;
+    }
+    #crosshair:after {
+      content:""; display:block; width:100%; height:100%;
+      border:1.5vw solid #ffeb4d; border-radius:50%;
+      box-sizing:border-box;
+      box-shadow:0 0 8px #ffe800bb, 0 0 2vw #ffed65aa;
+    }
+    @media (max-width:650px) {
+      #mc-w,#mc-a,#mc-s,#mc-d,#mc-shoot { font-size:9vw; width:17vw; height:17vw; }
+      #hud { font-size:6vw; }
+      #help { font-size:4vw; }
+    }
+  </style>
+</head>
+<body>
+  <div id="startPanel">
+    <div class="title">Kub FPS (kun/tun, zombilar tunda)</div>
+    <button id="startBtn">Boshlash</button>
+    <div id="footer"><b>nurmahmadov ramazon</b></div>
+  </div>
+  <div id="restartPanel" style="display:none;">
+    <div class="title">O‘YIN TUGADI</div>
+    <div style="color:#ffe000; font-size:5vw; margin-bottom:4vh;">Qayta o‘ynash uchun tugmani bosing</div>
+    <button id="restartBtn">Qayta o‘ynash</button>
+    <div id="footer"><b>nurmahmadov ramazon</b></div>
+  </div>
+  <div id="pointerlock-info">O‘ynash uchun biror joyni bosing<br><span style="font-size:3vw;color:#ffe">Sichqoncha harakati va o‘q otish faollashadi</span></div>
+  <div id="help" style="display:none;">
+    WASD yoki pastdagi tugmalar – yurish<br>
+    Ekranda barmoq bilan aylantirish – qarash yo‘nalishi<br>
+    <b>Qizil tugma (&#x1F52B;)</b> – o‘q otish<br>
+    10 ta zombi tunda boshlanadi, har safar o‘ldirsa +1 zombi<br>
+    <b>Uyga faqat o‘yinchi kiradi, zombilar kira olmaydi! Zombilar faqat tunda chiqadi!</b>
+  </div>
+  <div id="hud"></div>
+  <div id="mobile-controls">
+    <div class="mc-btn" id="mc-w">W</div>
+    <div class="mc-btn" id="mc-a">A</div>
+    <div class="mc-btn" id="mc-s">S</div>
+    <div class="mc-btn" id="mc-d">D</div>
+    <div class="mc-btn" id="mc-shoot">&#x1F52B;</div>
+  </div>
+  <div id="crosshair"></div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
+  <script>
+    // KUN/TUN VAQT
+    let timeElapsed = 0; // sekundlarda
+    let dayLength = 60;  // 1 kun = 60 sekund (tezroq ko‘rinadi)
+    let nightStart = 18, nightEnd = 6; // 18:00...06:00 oraliq tunda
+    let curDay = 1, curHour = 0, curMin = 0, isNight = false;
+    function updateTime(dt) {
+      timeElapsed += dt;
+      let t = timeElapsed % dayLength;
+      let frac = t / dayLength;
+      curHour = Math.floor(frac * 24);
+      curMin = Math.floor((frac * 24 - curHour) * 60);
+      curDay = Math.floor(timeElapsed / dayLength) + 1;
+      // Tunda: (yoki 0...6, 18...24)
+      isNight = (curHour >= nightStart || curHour < nightEnd);
+    }
+    function getTimeString() {
+      let h = String(curHour).padStart(2, '0');
+      let m = String(curMin).padStart(2, '0');
+      return `Kun: ${curDay}<span class="clock">${h}:${m}</span>${isNight ? '<span class="night">TUN</span>' : '<span class="day">KUNDUZ</span>'}`;
+    }
+
+    function isMobile() {
+      return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+    }
+    let gameStarted = false, playerAlive = true;
+    const startPanel = document.getElementById('startPanel');
+    const restartPanel = document.getElementById('restartPanel');
+    document.getElementById('startBtn').onclick = () => startGame();
+    document.getElementById('restartBtn').onclick = () => startGame();
+
+    let pointerLocked = false;
+    const pointerInfo = document.getElementById('pointerlock-info');
+    function enablePointerLock() {
+      let canvas = renderer.domElement;
+      if (canvas.requestPointerLock) canvas.requestPointerLock();
+    }
+    function onPointerLockChange() {
+      pointerLocked = (document.pointerLockElement === renderer.domElement);
+      pointerInfo.style.display = (pointerLocked || isMobile()) ? 'none' : '';
+    }
+    document.addEventListener('pointerlockchange', onPointerLockChange, false);
+
+    function startGame() {
+      startPanel.style.display = 'none';
+      restartPanel.style.display = 'none';
+      document.getElementById('help').style.display = '';
+      gameStarted = true;
+      playerAlive = true;
+      playerHp = 100;
+      player.position.set(0, 1.1, 0);
+      for(let z of zombies) scene.remove(z);
+      zombies = [];
+      for(let b of bullets) scene.remove(b);
+      bullets = [];
+      pointerInfo.style.display = (pointerLocked || isMobile()) ? 'none' : '';
+      lastShotTime = 0;
+      // vaqt boshlash
+      timeElapsed = 0; curDay = 1; curHour = 0; curMin = 0; isNight = false;
+      updateHud();
+      // Faqat tunda 10 ta zombi paydo bo‘ladi
+      if (isNight) for(let i=0;i<10;++i) spawnZombie();
+    }
+    function showRestartPanel() {
+      restartPanel.style.display = '';
+      setTimeout(()=>restartPanel.classList.remove('hide'),10);
+    }
+
+    // --- Kengaytirilgan maydon va obstacles array ---
+    let scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x233123);
+    let camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 300);
+    let renderer = new THREE.WebGLRenderer({antialias:true, alpha:false});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio?window.devicePixelRatio:1);
+    document.body.appendChild(renderer.domElement);
+
+    let ambLight = new THREE.AmbientLight(0xffffff, 0.72);
+    scene.add(ambLight);
+    let dirLight = new THREE.DirectionalLight(0xffffff, 1.12);
+    dirLight.position.set(22,38,19);
+    scene.add(dirLight);
+
+    let obstacles = [];
+    let houseObs = [];
+
+    // YER
+    let ground = new THREE.Mesh(
+      new THREE.BoxGeometry(240,2,240), // kengroq
+      new THREE.MeshPhongMaterial({color:0x497d36})
+    );
+    ground.position.y = -1;
+    scene.add(ground);
+
+    // DARAQTLAR
+    for(let i=0;i<32;++i){
+      let x = Math.random()*220-110, z = Math.random()*220-110;
+      if(Math.abs(x)<18 && Math.abs(z)<18) continue;
+      let trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.6,0.7,4,8),
+        new THREE.MeshPhongMaterial({color:0x7d5422})
+      );
+      trunk.position.set(x,2,z);
+      scene.add(trunk);
+      obstacles.push({type:'tree', x:x, z:z, r:2.1});
+      let leaves = new THREE.Mesh(
+        new THREE.SphereGeometry(2,10,10),
+        new THREE.MeshPhongMaterial({color:0x2ea23a})
+      );
+      leaves.position.set(x,5,z);
+      scene.add(leaves);
+    }
+    // TOGLAR
+    for(let i=0;i<14;++i){
+      let x = Math.random()*200-100, z = Math.random()*200-100;
+      if(Math.abs(x)<32 && Math.abs(z)<32) continue;
+      let r = 7+Math.random()*3;
+      let tog = new THREE.Mesh(
+        new THREE.ConeGeometry(r, 14+Math.random()*8, 24),
+        new THREE.MeshPhongMaterial({color:0xcfcfc2})
+      );
+      tog.position.set(x, 7, z);
+      scene.add(tog);
+      obstacles.push({type:'mount', x:x, z:z, r:r});
+    }
+
+    // --- UY ---
+    const houseX = 30, houseZ = -24, houseW = 10, houseD = 10, houseH = 6;
+    let house = new THREE.Group();
+    let wallMat = new THREE.MeshPhongMaterial({color:0xc9bd96});
+    let wallBack = new THREE.Mesh(new THREE.BoxGeometry(houseW,houseH,1), wallMat);
+    wallBack.position.set(houseX, houseH/2, houseZ-houseD/2+0.5);
+    house.add(wallBack);
+    houseObs.push({x:houseX, z:houseZ-houseD/2+0.5, r:houseW/2+0.5});
+    let wallLeft = new THREE.Mesh(new THREE.BoxGeometry(1,houseH,houseD), wallMat);
+    wallLeft.position.set(houseX-houseW/2+0.5, houseH/2, houseZ);
+    house.add(wallLeft);
+    houseObs.push({x:houseX-houseW/2+0.5, z:houseZ, r:houseD/2+0.5});
+    let wallRight = new THREE.Mesh(new THREE.BoxGeometry(1,houseH,houseD), wallMat);
+    wallRight.position.set(houseX+houseW/2-0.5, houseH/2, houseZ);
+    house.add(wallRight);
+    houseObs.push({x:houseX+houseW/2-0.5, z:houseZ, r:houseD/2+0.5});
+    let wallFront1 = new THREE.Mesh(new THREE.BoxGeometry((houseW-2.4)/2,houseH,1), wallMat);
+    wallFront1.position.set(houseX-(houseW/4+0.6), houseH/2, houseZ+houseD/2-0.5);
+    house.add(wallFront1);
+    let wallFront2 = new THREE.Mesh(new THREE.BoxGeometry((houseW-2.4)/2,houseH,1), wallMat);
+    wallFront2.position.set(houseX+(houseW/4+0.6), houseH/2, houseZ+houseD/2-0.5);
+    house.add(wallFront2);
+    let wallFrontTop = new THREE.Mesh(new THREE.BoxGeometry(2.4,houseH-3,1), wallMat);
+    wallFrontTop.position.set(houseX, houseH-1.5, houseZ+houseD/2-0.5);
+    house.add(wallFrontTop);
+    let roof = new THREE.Mesh(new THREE.BoxGeometry(houseW+0.5,1,houseD+0.5), new THREE.MeshPhongMaterial({color:0x927c4f}));
+    roof.position.set(houseX, houseH+0.5, houseZ);
+    house.add(roof);
+    scene.add(house);
+
+    // O‘YINCHI (kub faqat pozitsiya uchun, ko‘rinmaydi)
+    let player = new THREE.Mesh(
+      new THREE.BoxGeometry(2, 2, 2),
+      new THREE.MeshPhongMaterial({color: 0x2277ff, opacity:0.0, transparent:true})
+    );
+    player.position.set(0, 1.1, 0);
+    scene.add(player);
+
+    let playerHp = 100;
+
+    function updateHud(){
+      document.getElementById('hud').innerHTML =
+        `${getTimeString()}<br>Hayot: <span style="color:${playerHp>40?'#aaffb0':(playerHp>20?'#ffe000':'#ff4444')};">${playerHp}</span>`;
+    }
+
+    // --- FPS-style harakat ---
+    let keys = {};
+    window.addEventListener('keydown', e=>{
+      if(gameStarted && playerAlive) keys[e.code]=true;
+      if(!playerAlive && (e.code=='Space'||e.code=='Enter')) {
+        showRestartPanel();
+      }
+    });
+    window.addEventListener('keyup',   e=>{ if(gameStarted && playerAlive) keys[e.code]=false; });
+
+    // Kamera boshqaruvi (FPS Pointer Lock, mobil drag)
+    let camYaw = 0, camPitch = 12;
+    renderer.domElement.addEventListener('click', function(e){
+      if (gameStarted && !pointerLocked && !isMobile()) enablePointerLock();
+    });
+    document.addEventListener("mousemove", function(e){
+      if(!gameStarted || !playerAlive) return;
+      if(pointerLocked) {
+        camYaw   -= e.movementX * 0.32;
+        camPitch -= e.movementY * 0.22;
+        camPitch = Math.max(-40, Math.min(40, camPitch));
+      }
+    });
+    let lastTouchX=0,lastTouchY=0,dragging=false;
+    renderer.domElement.addEventListener('touchstart', function(e){
+      if(!isMobile() || !gameStarted || !playerAlive) return;
+      dragging = true;
+      lastTouchX = e.touches[0].clientX;
+      lastTouchY = e.touches[0].clientY;
+    });
+    renderer.domElement.addEventListener('touchmove', function(e){
+      if(!dragging || !isMobile() || !gameStarted || !playerAlive) return;
+      let dx = e.touches[0].clientX - lastTouchX;
+      let dy = e.touches[0].clientY - lastTouchY;
+      camYaw   -= dx * 0.32;
+      camPitch -= dy * 0.22;
+      camPitch = Math.max(-40, Math.min(40, camPitch));
+      lastTouchX = e.touches[0].clientX;
+      lastTouchY = e.touches[0].clientY;
+      e.preventDefault();
+    }, {passive:false});
+    renderer.domElement.addEventListener('touchend', function(e){
+      dragging = false;
+    });
+
+    // --- O‘Q OTISH: sichqoncha yoki sensor tugma ---
+    let lastShotTime = 0;
+    document.addEventListener('mousedown', function(e){
+      if(!gameStarted || !playerAlive) return;
+      if(!pointerLocked && !isMobile()) return;
+      if(isMobile()) return;
+      if(e.button !== 0) return;
+      let now = performance.now();
+      if(now - lastShotTime > 180) {
+        shootBullet();
+        lastShotTime = now;
+      }
+    });
+    const mc = document.getElementById('mobile-controls');
+    if(isMobile()) mc.style.display = '';
+    function mkey(code, v) { keys[code]=v; }
+    document.getElementById('mc-w').addEventListener('touchstart', e=>{ mkey('KeyW',true); e.preventDefault(); });
+    document.getElementById('mc-a').addEventListener('touchstart', e=>{ mkey('KeyA',true); e.preventDefault(); });
+    document.getElementById('mc-s').addEventListener('touchstart', e=>{ mkey('KeyS',true); e.preventDefault(); });
+    document.getElementById('mc-d').addEventListener('touchstart', e=>{ mkey('KeyD',true); e.preventDefault(); });
+    document.getElementById('mc-w').addEventListener('touchend',   e=>{ mkey('KeyW',false); });
+    document.getElementById('mc-a').addEventListener('touchend',   e=>{ mkey('KeyA',false); });
+    document.getElementById('mc-s').addEventListener('touchend',   e=>{ mkey('KeyS',false); });
+    document.getElementById('mc-d').addEventListener('touchend',   e=>{ mkey('KeyD',false); });
+    document.getElementById('mc-shoot').addEventListener('touchstart', function(e){
+      if(!gameStarted || !playerAlive) return;
+      let now = performance.now();
+      if(now - lastShotTime > 180) {
+        shootBullet();
+        lastShotTime = now;
+      }
+      e.preventDefault();
+    });
+
+    // --- TO‘QINISH FUNKSIYASI ---
+    function isCollide(x, z, radius=1.12, who='player') {
+      let obsArr = obstacles.concat((who==='player') ? [] : houseObs);
+      for(let o of obsArr){
+        let dx = x - o.x, dz = z - o.z;
+        let minDist = radius + o.r;
+        if(dx*dx + dz*dz < minDist*minDist) return true;
+      }
+      return false;
+    }
+
+    // Zombilar
+    let zombies = [];
+    function spawnZombie() {
+      let angle = Math.random()*2*Math.PI;
+      let dist = 80 + Math.random()*110;
+      let zx = player.position.x + Math.cos(angle)*dist;
+      let zz = player.position.z + Math.sin(angle)*dist;
+      let tries = 0;
+      while((isCollide(zx, zz, 1.44, 'zombie')) && tries < 20){
+        angle = Math.random()*2*Math.PI;
+        dist = 80 + Math.random()*110;
+        zx = player.position.x + Math.cos(angle)*dist;
+        zz = player.position.z + Math.sin(angle)*dist;
+        tries++;
+      }
+      let zombie = new THREE.Mesh(
+        new THREE.SphereGeometry(1.44, 18, 13),
+        new THREE.MeshPhongMaterial({color:0xcc2222})
+      );
+      zombie.position.set(zx, 1.44, zz);
+      zombie.userData.cooldown = 0;
+      scene.add(zombie);
+      zombies.push(zombie);
+    }
+
+    // O‘q otish (kamera yo‘nalishida)
+    let bullets = [];
+    function shootBullet() {
+      let b = new THREE.Mesh(
+        new THREE.SphereGeometry(0.32, 8, 8),
+        new THREE.MeshPhongMaterial({color:0xf6b800})
+      );
+      let pos = player.position.clone();
+      b.position.copy(pos).add(new THREE.Vector3(0,0.9,0));
+      let yaw = camYaw * Math.PI / 180, pitch = camPitch * Math.PI / 180;
+      let dir = new THREE.Vector3(
+        -Math.sin(yaw)*Math.cos(pitch),
+        Math.sin(-pitch),
+        -Math.cos(yaw)*Math.cos(pitch)
+      );
+      dir.normalize();
+      b.userData.dir = dir;
+      b.userData.age = 0;
+      scene.add(b); bullets.push(b);
+    }
+
+    function gameOver(){
+      playerAlive = false;
+      updateHud();
+      setTimeout(()=>{
+        restartPanel.classList.remove('hide');
+        restartPanel.style.display = '';
+      }, 700);
+    }
+
+    // --- Zombi tunda chiqishi uchun yangi funksiya ---
+    let lastZombieSpawn = 0;
+    function spawnZombieIfNight(ts) {
+      if (!isNight) return;
+      // Dastlab tunda o'yin boshlanganda 10 ta chiqadi, keyin har 3 sekundda 1 ta
+      if(zombies.length < 10 || ts-lastZombieSpawn>3000) {
+        spawnZombie();
+        lastZombieSpawn = ts;
+      }
+    }
+
+    // O‘yin tsikli
+    let lastFrameTime = performance.now();
+    function animate(ts){
+      requestAnimationFrame(animate);
+      let now = performance.now();
+      let dt = Math.min((now-lastFrameTime)/1000, 0.2);
+      lastFrameTime = now;
+      if(gameStarted && playerAlive){
+        // Vaqtni yangilash va HUD
+        updateTime(dt);
+        updateHud();
+
+        // KUN/TUN: yorug‘lik va osmon
+        if(isNight){
+          ambLight.intensity = 0.19;
+          dirLight.intensity = 0.21;
+          scene.background.set(0x08122c);
+        } else {
+          ambLight.intensity = 0.78;
+          dirLight.intensity = 1.14;
+          scene.background.set(0x83bfff);
+        }
+
+        // Har safar tunda bo'lsa, zombi chiqishi
+        spawnZombieIfNight(ts);
+
+        // Harakat
+        let speed=0.33, vx=0, vz=0;
+        let rad = camYaw*Math.PI/180;
+        if(keys['KeyW']) {vx-=Math.sin(rad)*speed; vz-=Math.cos(rad)*speed;}
+        if(keys['KeyS']) {vx+=Math.sin(rad)*speed; vz+=Math.cos(rad)*speed;}
+        if(keys['KeyA']) {vx-=Math.cos(rad)*speed; vz+=Math.sin(rad)*speed;}
+        if(keys['KeyD']) {vx+=Math.cos(rad)*speed; vz-=Math.sin(rad)*speed;}
+        let npX = player.position.x + vx, npZ = player.position.z + vz;
+        if(!isCollide(npX, player.position.z, 1.12, 'player')) player.position.x = npX;
+        if(!isCollide(player.position.x, npZ, 1.12, 'player')) player.position.z = npZ;
+
+        // O‘q harakati va zombi urilishi
+        for(let i=bullets.length-1;i>=0;--i){
+          let b = bullets[i];
+          let np = b.position.clone().add(b.userData.dir.clone().multiplyScalar(0.95));
+          if(isCollide(np.x, np.z, 0.32, 'zombie')){
+            scene.remove(b); bullets.splice(i,1); continue;
+          }
+          b.position.copy(np);
+          b.userData.age+=0.025;
+          if(b.userData.age>2.5){
+            scene.remove(b); bullets.splice(i,1); continue;
+          }
+          for(let j=zombies.length-1;j>=0;--j){
+            let z = zombies[j];
+            if(b.position.distanceTo(z.position)<1.42){
+              scene.remove(z); zombies.splice(j,1);
+              scene.remove(b); bullets.splice(i,1);
+              // Faqat tunda yangi zombi chiqadi
+              if (isNight) spawnZombie();
+              break;
+            }
+          }
+        }
+
+        // Zombilar: collision bilan yuradi (uy to‘siq!)
+        for(let z of zombies){
+          let dir = new THREE.Vector3().subVectors(player.position, z.position); dir.y = 0;
+          let dist = dir.length();
+          if(dist>1.7){
+            dir.normalize();
+            let step = dir.clone().multiplyScalar(0.10);
+            let npX = z.position.x + step.x, npZ = z.position.z + step.z;
+            if(!isCollide(npX, z.position.z, 1.44, 'zombie')) z.position.x = npX;
+            if(!isCollide(z.position.x, npZ, 1.44, 'zombie')) z.position.z = npZ;
+          } else if(z.userData.cooldown<=0) {
+            playerHp -= 10;
+            updateHud();
+            z.userData.cooldown = 50;
+            if(playerHp<=0) {
+              playerHp=0; updateHud(); gameOver();
+            }
+          }
+          if(z.userData.cooldown>0) z.userData.cooldown--;
+        }
+      }
+
+      // Kamera: kub markazida (FPS)
+      let cangle = camYaw*Math.PI/180;
+      let cpitch = camPitch*Math.PI/180;
+      let camTarget = player.position.clone().add(new THREE.Vector3(0,0.8,0));
+      camera.position.copy(camTarget);
+      let look = camTarget.clone().add(new THREE.Vector3(
+        -Math.sin(cangle)*Math.cos(cpitch),
+        Math.sin(-cpitch),
+        -Math.cos(cangle)*Math.cos(cpitch)
+      ));
+      camera.lookAt(look);
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    function resize(){
+      renderer.setSize(window.innerWidth,window.innerHeight);
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', resize);
+    resize();
+  </script>
+</body>
+</html>
